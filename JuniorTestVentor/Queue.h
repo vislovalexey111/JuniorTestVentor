@@ -3,7 +3,6 @@
 
 #include <cstdint>
 #include <cstdlib>
-#include <cstring>
 #include <cstdio>
 
 #define uint8 uint8_t
@@ -15,11 +14,11 @@ private:
 	uint16 Head;
 	uint16 Tail;
 	uint16 Size;
-	uint8 *hData;
+	uint8* hData;
 public:
 	Queue(uint16 iSize);
 	~Queue(void);
-	
+
 	uint16 Put(uint8* Data, uint16 iSize);
 	uint16 GetSize(void);
 	uint16 Get(uint8* Data, uint16 iSize);
