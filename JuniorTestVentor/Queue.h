@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstdio>
+#include <cstring>
 
 #define uint8 uint8_t
 #define uint16 uint16_t

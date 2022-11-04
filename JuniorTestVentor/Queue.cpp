@@ -5,40 +5,42 @@ const uint16 Min(const uint16 a, const uint16 b)
 	return (a < b) ? a : b;
 }
 
-Queue::Queue(uint16 iSize) : hData(NULL), Head(0), Size(iSize)
+Queue::Queue(uint16 iSize) : hData(NULL), Head(0), Tail(0), Size(0)
 {
-	// If memory size was specified - creating empty "Queue" and allocating memory of that size.
-	if (Size > 0)
-		hData = (uint8*)calloc(Size, sizeof(uint8));
-
-	// The "Tail" is a variable of "uint16_t" type, so we can't set it to -1 to indicate emptiness of the queue.
-	// However, we can set it equal to memory size (because in non-empty queue won't have a "Tail" index equal to "Size".
-	Tail = Size;
+	// If specified size is bigger than 0 - creating empty queue and allocating memory of
+	// iSize + 1 bytes, so we can control data overflow.
+	if (iSize > 0)
+	{
+		hData = (uint8*)calloc(++iSize, sizeof(uint8));
+		if (hData) Size = iSize;
+	}
 }
 
 Queue::~Queue(void)
 {
-	free(hData);
-	hData = NULL;
+	if (hData)
+	{
+		free(hData);
+		hData = NULL;
+	}
 }
 
 uint16 Queue::Put(uint8* Data, uint16 iSize)
 {
-	// Returning 0 in cases if we don't have data source/destination, we didn't specified
-	// size of the data transfer or we don't have enough space in the current queue.
-	if (!hData || !Data || !iSize || this->GetSize() + iSize > Size)
+	// Returning 0 in case we don't have: data source/destination, data to put or engough space in our queue.
+	// Adding 1 to required space - 1 byte of control memory overflow.
+	if (!hData || !Data || !iSize || this->GetSize() + iSize + 1 > Size)
 		return 0;
+	
+	uint16 transferSize = Min(iSize, Size - (Tail + 1));
 
-	// Checking, if our queue is empty to add data correctly.
-	uint16 isEmpty = (Tail == Size);
-	Tail = (isEmpty) ? Head : Tail;
-	Head = (Head + iSize - isEmpty) % Size;
+	// Transfering data, that we can put before buffer boundary.
+	memmove(&hData[(Tail + this->GetSize() + 1) % Size], Data, transferSize);
+	Head = (Head + iSize) % Size;
 
-	for (uint16 i = 0, h = Head; i < iSize; i++)
-	{
-		hData[h] = Data[i];
-		h = (h == 0) ? (Size - 1) : (h - 1); // If we crossed the border - setting the correct index.
-	}
+	// Transfering data to the queue after buffer boundary (if we didn't transfer all tha data)
+	if (transferSize != iSize)
+		memmove(hData, Data + transferSize, iSize - transferSize);
 
 	return iSize;
 }
@@ -46,50 +48,44 @@ uint16 Queue::Put(uint8* Data, uint16 iSize)
 uint16 Queue::GetSize(void)
 {
 	// Returning 0 if our queue is empty.
-	if (!hData || Tail == Size)
-		return 0;
+	if (!hData || Tail == Head) return 0;
 
-	// If the data crossing the boderd, returning:  (size of data berfore border) + (size of data after border).
-	if (Tail > Head)
-		return (Size - Tail) + (Head + 1);
+	// Returning (data before boundary) + (data after boundary).
+	if (Tail > Head) return (Size - Tail) + Head;
 
-	return Head - Tail + 1;
+	return Head - Tail;
 }
 
 uint16 Queue::Get(uint8* Data, uint16 iSize)
 {
-	// Retrning 0, if we don't have data source/destination, size of transfer is not specified or our queue is empty.
-	if (!Data || !hData || !iSize || Tail == Size)
+	// Returning 0 if we don't have data source/destination or we have have nothing to copy.
+	if (!Data || !hData || !iSize || Tail == Head)
 		return 0;
 
-	uint16 transferSize = Min(this->GetSize(), iSize);
+	uint16 transferSize = Min(this->GetSize(), iSize); 
+	uint16 bufferScopedSize = Min(transferSize, Size - (Tail + 1));
+	
+	// Getting all data before buffer boundary.
+	memmove(Data, &hData[(Tail + 1) % Size], bufferScopedSize);
 
-	for (uint16 i = 0, h = Head; i < transferSize; i++)
-	{
-		Data[i] = hData[h];
-		h = (h == 0) ? (Size - 1) : (h - 1); // If we crossed the border - setting the correct index.
-	}
+	// Getting data after buffer boundary (if we didn't get all the data)
+	if (bufferScopedSize != transferSize)
+		memmove(Data + bufferScopedSize, hData, transferSize - bufferScopedSize);
 
 	return transferSize;
 }
 
 uint16 Queue::Clear(uint16 iSize)
 {
-	// No need to clear data from the tail if the size to clear was not specified or the queue is empty.
-	if (!hData || !iSize || Tail == Size)
+	// Returning 0 if we don't have data source, the queue is empty or the clear size is 0.
+	if (!hData || !iSize || Tail == Head)
 		return 0;
 
-	const uint16 initialSize = this->GetSize();
+	const uint16 notClearedSize = this->GetSize();
 
-	// If the data to clear is bigger or equal to our queue size - setting the queue emptiness indicator.
-	if (iSize >= initialSize)
-		Tail = Size;
-	// If both data and clear size crossing the border - setting the "Tail" index after the border.
-	else if (Tail > Head && Tail + iSize >= Size)
-		Tail = (Tail + iSize) % Size;
-	else
-		Tail += iSize;
+	if (iSize >= notClearedSize) Tail = Head; // Setting queue emptyness indicator, if we cleared everything.
+	else Tail = (Tail + iSize) % Size;
 
-	// Returning difference between initial and current sizes of the queue.
-	return initialSize - this->GetSize();
+	// returning difference between queue data before and after.
+	return notClearedSize - this->GetSize();
 }
