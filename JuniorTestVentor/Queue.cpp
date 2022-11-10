@@ -36,11 +36,12 @@ uint16 Queue::Put(uint8* Data, uint16 iSize)
 
 	// Transfering data, that we can put before buffer boundary.
 	memmove(&hData[(Tail + this->GetSize() + 1) % Size], Data, transferSize);
-	Head = (Head + iSize) % Size;
-
+	
 	// Transfering data to the queue after buffer boundary (if we didn't transfer all tha data)
 	if (transferSize != iSize)
 		memmove(hData, Data + transferSize, iSize - transferSize);
+
+	Head = (Head + iSize) % Size;
 
 	return iSize;
 }
@@ -81,11 +82,8 @@ uint16 Queue::Clear(uint16 iSize)
 	if (!hData || !iSize || Tail == Head)
 		return 0;
 
-	const uint16 notClearedSize = this->GetSize();
+	const uint16 clearSize = Min(iSize, this->GetSize());
+	Tail = (Tail + clearSize) % Size;
 
-	if (iSize >= notClearedSize) Tail = Head; // Setting queue emptyness indicator, if we cleared everything.
-	else Tail = (Tail + iSize) % Size;
-
-	// returning difference between queue data before and after.
-	return notClearedSize - this->GetSize();
+	return clearSize;
 }

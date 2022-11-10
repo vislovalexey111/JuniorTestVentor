@@ -72,6 +72,7 @@ int main()
 	bigData = NULL;
 	smallData = NULL;
 
+	getchar();
 	return 0;
 }
 
